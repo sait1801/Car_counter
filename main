@@ -1,0 +1,350 @@
+# 54-57. satirlar arasi hesaplamalar yanlis p4,p5,p6,p7 koordinatlari hesaplanacak
+# 94-101. satirlar arasi alanlarin köseleri mevcut.
+# cv2.pointPolygontest ile bu arealarin icindeki centroidler sayilacak. Centroid hareket eden cisismlerin hareket merkezi demek
+# her alandaki centroid sayisi artti mi azaldi mi buna bakilacak
+# bu alanlardaki artis azalislere gore iceri mi girirldi disari mi cikildi return edilecek
+# po--p6--p4--p3
+# p1--p7--p5--p2
+
+import cv2
+import numpy as np
+from shapely.geometry import Point
+import time
+import keyboard
+import os
+
+
+def video_or_live():
+    print("video file must be in the same directory with the executable")
+    print("press q to exit")
+    answer = input("video or live ?")
+    if answer == 'video':
+        video_name = input("enter the video name:")
+    elif answer == 'live':
+        video_name = input("enter the camera:")
+        video_name = int(video_name)
+    else:
+        print("wrong input program terminated")
+
+    return video_name
+
+
+def roi_determination(video_name):
+    alignment = input("horizontal or vertical counting, please enter h or v:")
+    points = []
+    def click_event(event, x, y, flags, param):
+        if event == cv2.EVENT_RBUTTONDOWN:
+            cv2.circle(frame1, (x, y), 3, (0, 255, 255), -1)
+            points.append((x, y))
+            if 4 >= len(points) >= 2:
+                cv2.line(frame1, points[-1], points[-2], (0, 255, 255), 3)
+                if len(points) == 4:
+                    cv2.line(frame1, points[-1], points[0], (0, 255, 255), 3)
+                    print("no more points")
+    # draw and append the points of roi
+    cap = cv2.VideoCapture(video_name)
+    ret, frame1 = cap.read()
+    print("draw the roi in given way:")
+    print("p0-----p3")
+    print("|-------|")
+    print("p1-----p2")
+    while (cap.isOpened() and (len(points) <= 4)):
+        cv2.imshow('determine the region of interest', frame1)
+        cv2.setMouseCallback('determine the region of interest', click_event)
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    # taking the necessary coordinates
+    points = points[0:4]
+    cv2.destroyAllWindows()
+
+    if alignment == 'h':
+        #   dividing the roi into three equal areas
+        upper_maxpoint = max(points[0][1], points[3][1])
+        upper_minpoint = min(points[0][1], points[3][1])
+        lower_maxpoint = max(points[1][1], points[2][1])
+        lower_minpoint = min(points[1][1], points[2][1])
+
+        #   x coordinate determiantion for all points
+        point4_x = int(points[0][0] + ((2 * (points[3][0] - points[0][0])) / 3))
+        point5_x = int(points[1][0] + ((2 * (points[2][0] - points[1][0])) / 3))
+        point6_x = int(points[0][0] + ((points[3][0] - points[0][0]) / 3))
+        point7_x = int(points[1][0] + ((points[2][0] - points[1][0]) / 3))
+
+        #   y coordinate determination for upper horizontal line
+        if points[0][1] < points[3][1]:
+            point4_y = int(upper_minpoint + ((2 * (upper_maxpoint - upper_minpoint)) / 3))
+            point6_y = int(upper_minpoint + ((upper_maxpoint - upper_minpoint) / 3))
+
+        elif points[0][1] > points[3][1]:
+            point4_y = int(upper_minpoint + ((upper_maxpoint - upper_minpoint) / 3))
+            point6_y = int(upper_minpoint + ((2 * (upper_maxpoint - upper_minpoint)) / 3))
+
+        else:
+            point4_y = upper_maxpoint
+            point6_y = upper_maxpoint
+
+        #   y coordinate determiantion for lower horizontal line
+        if points[1][1] < points[2][1]:
+            point5_y = int(lower_minpoint + ((2 * (lower_maxpoint - lower_minpoint)) / 3))
+            point7_y = int(lower_minpoint + ((lower_maxpoint - lower_minpoint) / 3))
+
+        elif points[1][1] > points[2][1]:
+            point5_y = int(lower_minpoint + ((lower_maxpoint - lower_minpoint) / 3))
+            point7_y = int(lower_minpoint + ((2 * (lower_maxpoint - lower_minpoint)) / 3))
+
+        else:
+            point5_y = lower_maxpoint
+            point7_y = lower_maxpoint
+
+        point4 = (point4_x, point4_y)
+        point5 = (point5_x, point5_y)
+        point6 = (point6_x, point6_y)
+        point7 = (point7_x, point7_y)
+
+        #   appending the points into the points list
+        points.append(point4)
+        points.append(point5)
+        points.append(point6)
+        points.append(point7)
+        return points, alignment
+
+    elif alignment == 'v':
+
+        #   dividing the roi into three equal areas
+        left_maxpoint = max(points[0][0], points[1][0])
+        left_minpoint = min(points[0][0], points[1][0])
+        right_maxpoint = max(points[2][0], points[3][0])
+        right_minpoint = min(points[2][0], points[3][0])
+
+        #   y coordinate determiantion for all points
+        point4_y = int(points[3][1] + ((2 * (points[2][1] - points[3][1])) / 3))
+        point5_y = int(points[0][1] + ((2 * (points[1][1] - points[0][1])) / 3))
+        point6_y = int(points[3][1] + ((points[2][1] - points[3][1]) / 3))
+        point7_y = int(points[0][1] + ((points[1][1] - points[0][1]) / 3))
+
+        #   x coordinate determination for left vertical line
+        if points[1][0] < points[0][0]:
+            point7_x = int(left_minpoint + ((2 * (left_maxpoint - left_minpoint)) / 3))
+            point5_x = int(left_minpoint + ((left_maxpoint - left_minpoint) / 3))
+
+        elif points[1][0] > points[0][0]:
+            point7_x = int(left_minpoint + ((left_maxpoint - left_minpoint) / 3))
+            point5_x = int(left_minpoint + ((2 * (left_maxpoint - left_minpoint)) / 3))
+
+        else:
+            point5_x = left_maxpoint
+            point7_x = left_maxpoint
+
+        #   x coordinate determination for right vertical line
+        if points[2][0] < points[3][0]:
+            point6_x = int(right_minpoint + ((2 * (right_maxpoint - right_minpoint)) / 3))
+            point4_x = int(right_minpoint + ((right_maxpoint - right_minpoint) / 3))
+
+        elif points[2][0] > points[3][0]:
+            point6_x = int(right_minpoint + ((right_maxpoint - right_minpoint) / 3))
+            point4_x = int(right_minpoint + ((2 * (right_maxpoint - right_minpoint)) / 3))
+
+        else:
+            point4_x = right_maxpoint
+            point6_x = right_maxpoint
+
+        point4 = (point4_x, point4_y)
+        point5 = (point5_x, point5_y)
+        point6 = (point6_x, point6_y)
+        point7 = (point7_x, point7_y)
+
+        #   appending the points into the points list
+        points.append(point4)
+        points.append(point5)
+        points.append(point6)
+        points.append(point7)
+        return points, alignment
+
+
+
+def people_counting(vectorin):
+
+    if alignment == 'h':
+        number_of_people = 0
+        right = 0
+        left = 0
+        for i in range(len(deltas) - 1):
+            if deltas[i] == (0, 0, -1):
+                if deltas[i + 1] == (0, 1, 0):
+                    left = left + 1
+            elif deltas[i] == (-1, 0, 0):
+
+                if deltas[i + 1] == (0, 1, 0):
+                    right = right + 1
+        if vectorin == 'rigth':
+            number_of_people = right - left
+        elif vectorin == 'left':
+            number_of_people = left - right
+        print("number of people:" + str(number_of_people))
+        print("left:" + str(left))
+        print("rigth:" + str(right))
+
+    elif alignment == 'v':
+
+        number_of_people = 0
+        up = 0
+        down = 0
+        for i in range(len(deltas) - 1):
+            if deltas[i] == (0, 0, -1):
+                if deltas[i + 1] == (0, 1, 0):
+                    up = up+ 1
+            elif deltas[i] == (-1, 0, 0):
+
+                if deltas[i + 1] == (0, 1, 0):
+                    down = down + 1
+        if vectorin == 'down':
+            number_of_people = down - up
+        elif vectorin == 'up':
+            number_of_people = up - down
+        print("number of people:" + str(number_of_people))
+        print("upward:" + str(up))
+        print("downward:" + str(down))
+
+
+
+# initialize the program
+video_name = video_or_live()
+points, alignment = roi_determination(video_name)
+cap = cv2.VideoCapture(video_name)
+ret, frame1 = cap.read()
+ret, frame2 = cap.read()
+#some variables that will be used in the main program
+area1 = []
+people_area1 = 0
+area2 = []
+people_area2 = 0
+area3 = []
+people_area3 = 0
+delta_area1 = 0
+delta_area2 = 0
+delta_area3 = 0
+deltas = []
+sensitivity= int(30)
+objects_areas = int(400)
+#determination of which way is in
+vectorin = input("enter the which way is in? up, down, left, or right:")
+key = 1
+if alignment == 'h' and (vectorin == 'up' or vectorin == 'down'):
+    print("inappropriate input, program termianted")
+    key = 0
+if alignment == 'v' and (vectorin == 'l' or vectorin == 'r'):
+    print("inappropriate input, probram termianted")
+    key = 0
+# define and draw the contours of each area
+if alignment == 'h':
+    cnt1 = np.array([[points[0][0], points[0][1]], [points[1][0], points[1][1]],
+                    [points[6][0], points[6][1]], [points[7][0], points[7][1]]])
+
+    cnt2 = np.array([[points[6][0], points[6][1]], [points[7][0], points[7][1]],
+                    [points[5][0], points[5][1]], [points[4][0], points[4][1]]])
+
+    cnt3 = np.array([[points[4][0], points[4][1]], [points[5][0], points[5][1]],
+                    [points[2][0], points[2][1]], [points[3][0], points[3][1]]])
+
+elif alignment == 'v':
+    cnt1 = np.array([[points[0][0], points[0][1]], [points[7][0], points[7][1]],
+                    [points[6][0], points[6][1]], [points[3][0], points[3][1]]])
+
+    cnt2 = np.array([[points[7][0], points[7][1]], [points[5][0], points[5][1]],
+                    [points[4][0], points[4][1]], [points[6][0], points[6][1]]])
+
+    cnt3 = np.array([[points[5][0], points[5][1]], [points[1][0], points[1][1]],
+                    [points[2][0], points[2][1]], [points[4][0], points[4][1]]])
+# ------main loop------
+while (cap.isOpened() and key):
+    #finding the contours
+    diff = cv2.absdiff(frame1, frame2)
+    gray = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)  # makes the image blurred
+    _, thresh = cv2.threshold(blur, sensitivity, 255, cv2.THRESH_BINARY)  # makes 0-100 white and 100-255 black
+    dilated = cv2.dilate(thresh, None, iterations=1)  # dilate means the opposite of erosion
+    contours, _ = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)  # finds the contours
+    cv2.imshow('dilated', dilated)
+    #   draw the areas
+    cv2.line(frame1, points[0], points[1], (0, 0, 255), 2)
+    cv2.line(frame1, points[1], points[2], (148, 255, 255), 2)
+    cv2.line(frame1, points[2], points[3], (0, 255, 0), 2)
+    cv2.line(frame1, points[3], points[0], (148, 255, 255), 2)
+    cv2.line(frame1, points[4], points[5], (148, 255, 255), 2)
+    cv2.line(frame1, points[6], points[7], (148, 255, 255), 2)
+    # calculations on contours
+    people_area1 = 0
+    people_area2 = 0
+    people_area3 = 0
+    for contour in contours:
+        (x, y, w, h) = cv2.boundingRect(contour)
+        if cv2.contourArea(contour) < objects_areas:  # this must be a ratio of frame and kes
+            continue
+
+        cv2.rectangle(frame1, (x, y), (x + w, y + h), (0, 255, 0), 2)
+        centroid_x = int((x + x + w) / 2)
+        centroid_y = int((y + y + h) / 2)
+        center_of_contour = Point(centroid_x, centroid_y)
+        cv2.circle(frame1, (centroid_x, centroid_y), 2, (211, 0, 148), -1)
+        #whether the poin is on the areas or not
+        dist1 = cv2.pointPolygonTest(cnt1, (centroid_x, centroid_y), False)
+        dist2 = cv2.pointPolygonTest(cnt2, (centroid_x, centroid_y), False)
+        dist3 = cv2.pointPolygonTest(cnt3, (centroid_x, centroid_y), False)
+        # counting the number of people on each area
+        if dist1 == 1:
+            people_area1 = people_area1 + 1
+        area1.append(people_area1)
+        if len(area1) > 1:
+            delta_area1 = area1[-1] - area1[-2]
+        if len(area1) > 3:
+            area1 = area1[1:]
+
+        if dist2 == 1 or dist2 == 0:
+            people_area2 = people_area2 + 1
+        area2.append(people_area2)
+        if len(area2) > 1:
+            delta_area2 = area2[-1] - area2[-2]
+        if len(area2) > 3:
+            area2 = area2[1:]
+        if dist3 == 1:
+            people_area3 = people_area3 + 1
+        area3.append(people_area3)
+        if len(area3) > 1:
+            delta_area3 = area3[-1] - area3[-2]
+        if len(area3) > 3:
+            area3 = area3[1:]  # is this part okey ?
+        # change in number of people for each area
+        changes_at_moment = (delta_area1, delta_area2, delta_area3)
+        if changes_at_moment != (0, 0, 0):
+            deltas.append(changes_at_moment)
+            f = open('deltas.txt', 'a+')
+            f.write(str(changes_at_moment))
+            f.close()
+
+    if keyboard.is_pressed('w'):  # if key 'w' is pressed
+        people_counting(vectorin)
+
+    if keyboard.is_pressed('t'):  # if key 'w' is pressed
+        sensitivity = int(input("enter the sensitivity min 20 max 250:"))
+    if keyboard.is_pressed('a'):
+        objects_areas = int(input("enter the value of contour areas: "))
+
+
+    cv2.imshow('feed', frame1)
+    time.sleep(0.005)
+    frame1 = frame2
+    ret, frame2 = cap.read()
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+cv2.destroyAllWindows()
+cap.release()
+
+
+
+
+
+
+
+
+
